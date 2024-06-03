@@ -121,7 +121,7 @@ int main(int argc, char* args[])
     RCVpose rcv(opts);
     //Trains the model with the given parameters, if resume if true, will resume training from previous saved state
     if (train){
-        opts.resume_train = true;
+        //opts.resume_train = true;
         cout<<"inside train"<<endl;
         rcv.train();
 
