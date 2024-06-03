@@ -1,6 +1,6 @@
 #include "accumulator_space.h"
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 using namespace std;
 using namespace open3d;
 namespace e = Eigen;
@@ -636,7 +636,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             depth_tmp.release();
             sem_tmp.release();
 
-            cv::imwrite("out.png", sem_cv*255);
+            cv::imwrite(opts.model_dir + "/semantic_out_val.png", sem_cv*255);
             if(keypoint_count == 1)
             {
             	cv::Mat errorMat;
@@ -700,11 +700,9 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             }
 		std::cout<<std::endl;
 
-		std::cout<<"asdf123"<<std::endl;
             // Convert the depth image to a pointcloud
             //vector<Vertex> xyz = rgbd_to_point_cloud(linemod_K, depth_cv);
             //Eigen::MatrixXd xyz_r = rgbd_to_point_cloud(linemod_K, depth_cv,sem_cv,rad_cv);
-            //std::cout<<"asdf"<<std::endl;
             vector<Vertex> xyz;
             Eigen::MatrixXd xyz_r;
             if(opts.dname == "bw")
@@ -850,7 +848,6 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             }
         }
 	std::cout<<RT_matrix<<std::endl;
-	std::cout<<"LLLLLLLLLLLL"<<std::endl;
         matrix xy, xyz_load_est_transformed;
 
 
@@ -1110,7 +1107,6 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             cout << string(75, '-') << endl;
         }
         counter++;
-        break;
 
         double avg_correct_bf_icp, avg_correct_af_icp, percent_processed;
 

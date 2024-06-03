@@ -1,7 +1,7 @@
 #include "RMapDataset.h"
 
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 
 RMapDataset::RMapDataset(
@@ -81,7 +81,7 @@ CustomExample RMapDataset::get(size_t index) {
 	cv::Mat radial_kpt3 = read_npy(radialpath3_ + img_id + ".npy");
 	
 	std::vector<torch::Tensor> transfromed_data = transform(img, radial_kpt1, radial_kpt2, radial_kpt3);
-	//std::cout<<"hello"<<std::endl;
+
 	return CustomExample(transfromed_data[0], transfromed_data[1], transfromed_data[2], transfromed_data[3], transfromed_data[4]);
 }
 

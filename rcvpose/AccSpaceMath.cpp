@@ -1,10 +1,10 @@
 #include "AccSpaceMath.h"
-#include <nlohmann/json.hpp>
+//#include <nlohmann/json.hpp>
 
 using namespace std;
 using namespace open3d;
 using namespace Eigen;
-using json = nlohmann::json;
+//using json = nlohmann::json;
 
 typedef shared_ptr<geometry::PointCloud> pc_ptr;
 typedef geometry::PointCloud pc;
@@ -121,7 +121,6 @@ Eigen::MatrixXd rgbd_to_point_cloud(const array<array<double, 3>, 3>& K, const c
     cv::Mat depth64F;
     depth.convertTo(depth64F, CV_64F);  // Convert depth image to CV_64F
     
-    std::cout<<"asdf"<<std::endl;
     vector<cv::Point> nonzeroPoints;
     cv::findNonZero(sem, nonzeroPoints);
 
@@ -272,61 +271,64 @@ std::vector<Vertex> perspectiveDepthImageToPointCloud2(const cv::Mat& image_dept
 }
 
 std::vector<Vertex> perspectiveDepthImageToPointCloud(const cv::Mat& depthImg, const std::string& jsonPath) {
-    std::ifstream i(jsonPath);
-    json data;
-    i >> data;
-
-    Eigen::Matrix4f Base_transformation_wrt_Camera = Eigen::Matrix4f::Identity();
-    Base_transformation_wrt_Camera(2, 2) = -1;
-    Base_transformation_wrt_Camera(1, 1) = -1;
-    Base_transformation_wrt_Camera(2, 3) = data["location"][2];
-    Eigen::Vector3f camera_eye_position(0, 0, data["location"][2]);
-
-    // Assuming you have these view and projection matrices computed somewhere
-    Eigen::Matrix4f viewMatrix; // Populate this
-    viewMatrix << 1.0, -0.0,  0.0, -0.0,
-              0.0,  1.0,  0.0, -0.0,
-             -0.0, -0.0,  1.0, -0.40000001,
-              0.0,  0.0,  0.0,  1.0;
-    Eigen::Matrix4f projectionMatrix; // Populate this
-    projectionMatrix << 2.00568962, 0.0,        0.0, 0.0,
-                    0.0,        2.00568962, 0.0, 0.0,
-                    0.0,        0.0,       -3.0, -0.80000007,
-                    0.0,        0.0,       -1.0, 0.0;
-
-    int img_height = data["resolutionY"];
-    int img_width = data["resolutionX"];
+    std::vector<Vertex> fake;
+    return fake;
     
-    int stepX = 1;
-    int stepY = 1;
-    std::vector<Vertex> pointCloud;
+    //std::ifstream i(jsonPath);
+    //json data;
+    //i >> data;
 
-    Eigen::Matrix4f tran_pix_world = (projectionMatrix * viewMatrix).inverse();
-    std::cout<<tran_pix_world<<std::endl;
+    //Eigen::Matrix4f Base_transformation_wrt_Camera = Eigen::Matrix4f::Identity();
+    //Base_transformation_wrt_Camera(2, 2) = -1;
+    //Base_transformation_wrt_Camera(1, 1) = -1;
+    //Base_transformation_wrt_Camera(2, 3) = data["location"][2];
+    //Eigen::Vector3f camera_eye_position(0, 0, data["location"][2]);
 
-    for (int h = 0; h < img_height; h += stepY) {
-        for (int w = 0; w < img_width; w += stepX) {
-            float depth = depthImg.at<float>(h, w);
-            if (depth == 0) continue;
-            //if(depth<0.39)
-            //	std::cout<<depth<<std::endl;
+    //// Assuming you have these view and projection matrices computed somewhere
+    //Eigen::Matrix4f viewMatrix; // Populate this
+    //viewMatrix << 1.0, -0.0,  0.0, -0.0,
+    //          0.0,  1.0,  0.0, -0.0,
+    //         -0.0, -0.0,  1.0, -0.40000001,
+    //          0.0,  0.0,  0.0,  1.0;
+    //Eigen::Matrix4f projectionMatrix; // Populate this
+    //projectionMatrix << 2.00568962, 0.0,        0.0, 0.0,
+    //                0.0,        2.00568962, 0.0, 0.0,
+    //                0.0,        0.0,       -3.0, -0.80000007,
+    //                0.0,        0.0,       -1.0, 0.0;
 
-            float x = (2.0f * w - img_width) / img_width;
-            float y = -(2.0f * h - img_height) / img_height;
-            float z = 2.0f * depth - 1;
-            //std::cout<<x<<"  ,  "<<y<<"  ,  "<<z<<std::endl;
-            Eigen::Vector4f pixPos(x, y, z, 1);
-            Eigen::Vector4f position = tran_pix_world * pixPos;
+    //int img_height = data["resolutionY"];
+    //int img_width = data["resolutionX"];
+    //
+    //int stepX = 1;
+    //int stepY = 1;
+    //std::vector<Vertex> pointCloud;
 
-            Eigen::Vector3f point_world_loc = position.head<3>() / position[3];
-            //std::cout<<point_world_loc<<std::endl;
-            Eigen::Vector3f point_loc = Base_transformation_wrt_Camera.block<3, 3>(0, 0) * point_world_loc + Base_transformation_wrt_Camera.block<3, 1>(0, 3);
-            pointCloud.push_back(Vertex{point_loc.x(), point_loc.y(), point_loc.z()});
-            //std::cout<<point_loc.x()<<"  ,  "<< point_loc.y()<<"  ,  "<< point_loc.z()<<std::endl;
-        }
-    }
+    //Eigen::Matrix4f tran_pix_world = (projectionMatrix * viewMatrix).inverse();
+    //std::cout<<tran_pix_world<<std::endl;
 
-    return pointCloud;
+    //for (int h = 0; h < img_height; h += stepY) {
+    //    for (int w = 0; w < img_width; w += stepX) {
+    //        float depth = depthImg.at<float>(h, w);
+    //        if (depth == 0) continue;
+    //        //if(depth<0.39)
+    //        //	std::cout<<depth<<std::endl;
+
+    //        float x = (2.0f * w - img_width) / img_width;
+    //        float y = -(2.0f * h - img_height) / img_height;
+    //        float z = 2.0f * depth - 1;
+    //        //std::cout<<x<<"  ,  "<<y<<"  ,  "<<z<<std::endl;
+    //        Eigen::Vector4f pixPos(x, y, z, 1);
+    //        Eigen::Vector4f position = tran_pix_world * pixPos;
+
+    //        Eigen::Vector3f point_world_loc = position.head<3>() / position[3];
+    //        //std::cout<<point_world_loc<<std::endl;
+    //        Eigen::Vector3f point_loc = Base_transformation_wrt_Camera.block<3, 3>(0, 0) * point_world_loc + Base_transformation_wrt_Camera.block<3, 1>(0, 3);
+    //        pointCloud.push_back(Vertex{point_loc.x(), point_loc.y(), point_loc.z()});
+    //        //std::cout<<point_loc.x()<<"  ,  "<< point_loc.y()<<"  ,  "<< point_loc.z()<<std::endl;
+    //    }
+    //}
+
+    //return pointCloud;
 }
 
 void divideByLargest(cv::Mat& matrix, const bool& debug = false) {

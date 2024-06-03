@@ -10,18 +10,18 @@ using namespace std;
 Options testing_options() {
     Options opts;
     opts.dname = "lm";
-    opts.root_dataset = "/home/jadoo/rcvpose_cpp/test";
+    opts.root_dataset = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset";
     //or ".../dataset/public/RCVLab/Bluewrist/16yw11"
-    opts.model_dir = "/home/jadoo/rcvpose_cpp/cpp_rcvpose/rcvpose/gpu_models/ape";
-    opts.resume_train = true;
+    opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
+    opts.resume_train = false;
     opts.optim = "adam";
     opts.frontend = "accumulator";
-    opts.batch_size = 4;
+    opts.batch_size = 8;
     opts.class_name = "ape";
     opts.initial_lr = 0.001;
     opts.reduce_on_plateau = true;
     opts.patience = 10;
-    opts.demo_mode = false;
+    opts.demo_mode = true;
     opts.verbose = true;
     opts.test_occ = false;
     opts.mask_threshold = 0.8;
@@ -36,8 +36,6 @@ int main(int argc, char* args[])
     bool train = false;
     bool validate = false;
     bool estimate = false;
-
-    cout<<argc<<" args: "<<args[0]<<"  ,  "<<args[1]<<endl;
 
     if(argc > 1){
         if (strcmp(args[1], "train") == 0){

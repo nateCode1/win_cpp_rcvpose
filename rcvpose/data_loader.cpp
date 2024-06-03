@@ -41,7 +41,7 @@ std::vector<torch::Tensor> RData::transform(cv::Mat& img, cv::Mat& gt1, cv::Mat&
 	torch::Tensor imgTensor = torch::from_blob(imgTransposed.data, { imgTransposed.rows, imgTransposed.cols, imgTransposed.channels() }, torch::kFloat32).clone();
 	imgTensor = imgTensor.permute({ 2, 0, 1 });
 	torch::Tensor gt1Tensor = torch::from_blob(gt1Transposed.data, { gt1Transposed.channels(), gt1Transposed.rows, gt1Transposed.cols }, torch::kFloat32).clone();
-    	torch::Tensor gt2Tensor = torch::from_blob(gt2Transposed.data, { gt2Transposed.channels(), gt2Transposed.rows, gt2Transposed.cols }, torch::kFloat32).clone();
+    torch::Tensor gt2Tensor = torch::from_blob(gt2Transposed.data, { gt2Transposed.channels(), gt2Transposed.rows, gt2Transposed.cols }, torch::kFloat32).clone();
 	torch::Tensor gt3Tensor = torch::from_blob(gt3Transposed.data, { gt3Transposed.channels(), gt3Transposed.rows, gt3Transposed.cols }, torch::kFloat32).clone();
 	torch::Tensor semTensor = torch::where(gt1Tensor > 0, torch::ones_like(gt1Tensor), torch::zeros_like(gt1Tensor));
 	

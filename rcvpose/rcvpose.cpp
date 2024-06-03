@@ -2,7 +2,6 @@
 #include <torch/nn/parallel/data_parallel.h> // Include the data_parallel.h header
 
 using namespace std;
-using namespace experimental;
 RCVpose::RCVpose(Options& options)
 {
 
@@ -289,7 +288,6 @@ void RCVpose::train()
 
 
 void RCVpose::validate() {
-    std::cout<<"ASDF"<<std::endl;
     estimate_6d_pose_lm(opts, model);
 }
 

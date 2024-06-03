@@ -129,9 +129,9 @@ Trainer::Trainer(const Options& opts, DenseFCNResNet152& model)
     best_acc_mean = std::numeric_limits<double>::infinity();
 
 
-    std::experimental::filesystem::path outPath(out);
-    if (!std::experimental::filesystem::is_directory(outPath)) {
-        if (std::experimental::filesystem::create_directories(outPath)) {
+    std::filesystem::path outPath(out);
+    if (!std::filesystem::is_directory(outPath)) {
+        if (std::filesystem::create_directories(outPath)) {
             std::cout << "Output directory created" << std::endl;
         }
         else {
@@ -154,17 +154,25 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
 {
     cout << string(100, '=') << endl; 
     cout << string(24, ' ') << "Begining Training Initialization" << endl << endl;
-    
+
+    // Start log file
+    string logFilePath = opts.model_dir + "/training_log.txt";
+    ofstream outFile(logFilePath, ios_base::trunc);
+    time_t now = time(nullptr);
+    tm* localTime = localtime(&now);
+    outFile << string(50, '#') << endl << "Training Started - " << put_time(localTime, "%Y-%m-%d %H:%M:%S") << endl << string(50, '#') << endl;
+    outFile.flush();
 
     torch::Device device(device_type);
     if (opts.verbose) {
         cout << "Setting up dataset loader" << endl;
     }
- 
-    auto train_dataset = RData(opts.root_dataset, opts.dname, "train", opts.class_name);
+    
+    //Note that val and train are swapped here, this is done to improve the quality of the trained model
+    auto train_dataset = RData(opts.root_dataset, opts.dname, "val", opts.class_name);
     torch::optional<size_t> train_size = train_dataset.size();
 
-    auto val_dataset = RData(opts.root_dataset, opts.dname, "val", opts.class_name);
+    auto val_dataset = RData(opts.root_dataset, opts.dname, "train", opts.class_name);
     torch::optional<size_t> val_size = val_dataset.size();
 
  
@@ -201,6 +209,9 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
     while (epoch < max_epoch) {
         auto epoch_start_time = std::chrono::steady_clock::now();
 
+        //Log start of new epoch
+        outFile << string(50, '-') << endl << "### Start of Epoch " << epoch << " ###" << endl;
+        outFile.flush();
 
         if (opts.verbose) {
             cout << string(100, '-') << endl;
@@ -216,10 +227,12 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         model->train();
 
         auto train_start = std::chrono::steady_clock::now();
+        int train_pix_gath = 0;
+
         for (const auto& batch : *train_loader) {
-            if (opts.verbose) {
-                printProgressBar(count, train_size.value(), 75);
-            }
+            //if (opts.verbose) {
+            //    printProgressBar(count, train_size.value(), 75);
+            //}
 
             iteration = batch.size() + iteration;
 
@@ -264,6 +277,7 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
             score_rad_3 = score_rad_3.permute({ 1, 0, 2, 3 });
             
             //score_sem = torch::sigmoid(score_sem);	
+
             torch::Tensor loss_s = loss_sem(score_sem, sem_target);
             torch::Tensor loss_r = compute_r_loss(score_rad_1, rad_1);
             loss_r += compute_r_loss(score_rad_2, rad_2);
@@ -271,7 +285,7 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
 
             //score_sem = torch::sigmoid(score_sem); 
             
-	    auto sem_target_ = torch::stack(batches[4], 0);
+	        auto sem_target_ = torch::stack(batches[4], 0);
             auto gt1Tensor = torch::stack(batches[1], 0);
             auto gt2Tensor = torch::stack(batches[2], 0);
             auto gt3Tensor = torch::stack(batches[3], 0);
@@ -279,35 +293,36 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
             //std::cout<<score_sem_.sizes()<<std::endl;
             cv::Mat sem_cv = torch_tensor_to_cv_mat(sem_target_[0][0]);
             cv::Mat sem_cv_ = torch_tensor_to_cv_mat(score_sem_[0][0]);
-            cv::Mat rad_cv1 = torch_tensor_to_cv_mat(score_rad_1.to(torch::kCPU)[0][0]);
+            //cv::Mat rad_cv1 = torch_tensor_to_cv_mat(score_rad_1.to(torch::kCPU)[0][0]);
+            cv::Mat rad_cv1 = torch_tensor_to_cv_mat(gt1Tensor[0][0]);
             cv::Mat rad_cv2 = torch_tensor_to_cv_mat(gt2Tensor[0][0]);
             cv::Mat rad_cv3 = torch_tensor_to_cv_mat(gt3Tensor[0][0]);
             
-	    cv::transpose(sem_cv, sem_cv);
+	        cv::transpose(sem_cv, sem_cv);
             cv::transpose(sem_cv_, sem_cv_);
 
-	    double min;
+	        double min;
             double max;
             cv::Point min_loc;
             cv::Point max_loc;
-            minMaxLoc(sem_cv, &min, &max, &min_loc, &max_loc);
-            std::cout << "SEM Max: " << max << " SEM Min: " << min << std::endl;
+            /*minMaxLoc(sem_cv, &min, &max, &min_loc, &max_loc);
+            std::cout << "SEM Max: " << max << " SEM Min: " << min << std::endl;*/
             
-            minMaxLoc(sem_cv_, &min, &max, &min_loc, &max_loc);
-            std::cout << "SEM Max_: " << max << " SEM Min_: " << min << std::endl;
+            /*minMaxLoc(sem_cv_, &min, &max, &min_loc, &max_loc);
+            std::cout << "SEM Max_: " << max << " SEM Min_: " << min << std::endl;*/
             
-            minMaxLoc(rad_cv1, &min, &max, &min_loc, &max_loc);
-            std::cout << "RAD1 Max: " << max << " RAD1 Min: " << min << std::endl;
+            /*minMaxLoc(rad_cv1, &min, &max, &min_loc, &max_loc);
+            std::cout << "RAD1 Max: " << max << " RAD1 Min: " << min << std::endl;*/
             
-            minMaxLoc(rad_cv2, &min, &max, &min_loc, &max_loc);
-            std::cout << "RAD2 Max: " << max << " RAD2 Min: " << min << std::endl;
+            /*minMaxLoc(rad_cv2, &min, &max, &min_loc, &max_loc);
+            std::cout << "RAD2 Max: " << max << " RAD2 Min: " << min << std::endl;*/
             
-            minMaxLoc(rad_cv3, &min, &max, &min_loc, &max_loc);
-            std::cout << "RAD3 Max: " << max << " RAD3 Min: " << min << std::endl;
+            /*minMaxLoc(rad_cv3, &min, &max, &min_loc, &max_loc);
+            std::cout << "RAD3 Max: " << max << " RAD3 Min: " << min << std::endl;*/
 
-	    //cv::normalize(sem_cv_, sem_cv_, 0, 1, cv::NORM_MINMAX);
+	        //cv::normalize(sem_cv_, sem_cv_, 0, 1, cv::NORM_MINMAX);
             
-	    cv::Mat thresholded, thresholded_;
+	        cv::Mat thresholded, thresholded_;
             cv::threshold(sem_cv, thresholded, 0.5, 1, cv::THRESH_BINARY);
             thresholded.convertTo(sem_cv, sem_cv.type());
             thresholded.release();
@@ -330,15 +345,16 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
                 }
             }
 
-            cout << "Number of pixels gatherd: " << pixel_coor.size() << endl << endl;
+            cout << "Number of pixels gathered: " << pixel_coor.size() << endl;
+            train_pix_gath += pixel_coor.size();
             
-            cv::imwrite("asdf.png", sem_cv*255);
-            cv::imwrite("asdf_.png", sem_cv_*255);
+            cv::imwrite(opts.model_dir + "/asdf.png", sem_cv*255);
+            cv::imwrite(opts.model_dir + "/asdf_.png", sem_cv_*255);
         	
             // Look into different weigthings for loss
             torch::Tensor loss = loss_r + loss_s;
             
-            cout << "Radial Loss: " << loss_r.item<float>() << " Semantic Loss: " << loss_s.item<float>() << " Total Loss: " << loss.item<float>() << '/r';
+            cout << "Radial Loss: " << loss_r.item<float>() << " Semantic Loss: " << loss_s.item<float>() << " Total Loss: " << loss.item<float>() << endl;
 
             loss.backward();
 
@@ -349,10 +365,13 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
             if (np_loss.numel() == 0)
                 std::runtime_error("Loss is empty");
             count = batch.size() + count;
-            
-            //break;
+
+            cout /*<< string(10, '/')*/ << endl;
         }
-	//break;
+
+        // log pixels gathered
+        //outFile << "Avg Pixels Gathered Train: " << train_size.value() << " -- " << (train_pix_gath / train_size.value()) << endl << endl;
+        //outFile.flush();
 
         auto train_end = std::chrono::steady_clock::now();
         auto train_duration = std::chrono::duration_cast<std::chrono::seconds>(train_end - train_start);
@@ -365,7 +384,8 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         // ========================================================================================== \\
         //                                  Validation Epoch 									       \\
 
-        if ((epoch % 3 == 0) && (epoch != 0)) {
+        //if ((epoch % 3 == 0) && (epoch != 0)) {
+        if (true) {
             if (opts.verbose) {
                 cout << "Validation Epoch" << endl;
             }
@@ -492,6 +512,14 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
                 }
             }
 
+            //Log epoch data
+            outFile << "Mean Loss: " << mean_acc << endl;
+            outFile << "- Semantic Loss: " << sem_loss << endl;
+            outFile << "- Radial Loss: " << r_loss << endl;
+            outFile << "Iterations: " << iteration << endl;
+            outFile << "Epochs without improvement: " << epochs_without_improvement << endl;
+            outFile.flush();
+
 
             //================================================================\\
             //                  Save Model and Optimizer                      \\
@@ -512,8 +540,8 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
                     save_location = out + "/current";
                 }
 
-                if (!std::experimental::filesystem::is_directory(save_location))
-                    std::experimental::filesystem::create_directory(save_location);
+                if (!std::filesystem::is_directory(save_location))
+                    std::filesystem::create_directory(save_location);
 
                 torch::serialize::OutputArchive output_model_info;
                 output_model_info.write("epoch", epoch);
@@ -569,6 +597,9 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         }
         if (opts.reduce_on_plateau && epochs_without_improvement >= opts.patience) {
             cout << "Reducing learning rate" << endl;
+            outFile << "Reducing learning rate" << endl;
+            outFile.flush();
+
             current_lr.clear();
             for (auto& param_group : optim->param_groups()) {
                 if (param_group.has_options()) {
@@ -612,10 +643,10 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         }
         cout << endl;
 
-
         epoch++;
         session_iterations++;
     }
+    outFile.close();
 }
 
 torch::Tensor Trainer::compute_r_loss(torch::Tensor pred, torch::Tensor gt) {

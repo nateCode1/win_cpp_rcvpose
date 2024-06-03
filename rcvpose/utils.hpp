@@ -4,7 +4,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <experimental/filesystem>
+#include <filesystem>
 #include <vector>
 #include <cstdint>
 #include <torch/serialize.h>
@@ -142,8 +142,8 @@ inline void saveTensorToFile(const torch::Tensor& tensor, const std::string& fil
     std::string directory = filename.substr(0, found);
 
     // Create the directory if it doesn't exist
-    if (!std::experimental::filesystem::is_directory(directory)) {
-        if (!std::experimental::filesystem::create_directories(directory)) {
+    if (!std::filesystem::is_directory(directory)) {
+        if (!std::filesystem::create_directories(directory)) {
             std::cerr << "Error creating directory." << std::endl;
             return;
         }

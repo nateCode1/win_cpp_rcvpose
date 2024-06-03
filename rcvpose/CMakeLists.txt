@@ -9,57 +9,24 @@ if(POLICY CMP0141)
 endif()
 
 set(TARGET_NAME "rcvpose")
+
 project(${TARGET_NAME})
-
-set(CMAKE_PREFIX_PATH "/home/jadoo/libtorch/share/cmake")
-#set(TORCH_DIR "/home/jadoo/libtorch")
-#set(TORCH_LIBRARY "/home/jadoo/libtorch/lib")
-#set(Torch required PATHS "/home/jadoo/libtorch")
-set(OpenCV_DIR /usr/local/lib/cmake/opencv4)
-
-# Must fix on pc
- set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.1")
-# 
- set(CUDA_HOME "/usr/local/cuda-12.1")
-# 
- set (CUDA_NVCC_EXECUTABLE "/usr/local/cuda-12.1/bin/nvcc")
-# 
- set(CMAKE_CUDA_COMPILER "/usr/local/cuda-12.1/bin/nvcc")
-#
 
 find_package(OpenMP)
 
-find_package(Boost REQUIRED COMPONENTS filesystem)
-include_directories(${Boost_INCLUDE_DIRS})
-
-find_package(OpenCV REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS} )
-
-MESSAGE( STATUS "OpenCV_INCLUDE_DIRS: " ${OpenCV_INCLUDE_DIRS} )
-MESSAGE( STATUS "OpenCV_LIBRARIES: " ${OpenCV_LIBRARIES} )
-MESSAGE( STATUS "OpenCV_LIBRARY_DIRS: " ${OpenCV_LIBRARY_DIRS} )
-MESSAGE( STATUS "OpenCV_VERSION: " ${OpenCV_VERSION} )
-
-find_package(Open3D REQUIRED)
-include_directories(${Open3D_INCLUDE_DIRS} "/usr/local/include/")
-
+set(Torch_DIR "C:/RCVPose/libs/libtorch/share/cmake/Torch")
 find_package(Torch REQUIRED)
 include_directories(${TORCH_INCLUDE_DIRS})
 
-find_package(Eigen3 REQUIRED)
+set(OpenCV_DIR "C:/RCVPose/libs/opencv/build/x64/vc14/lib")
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
+set(Open3D_DIR "C:/RCVPose/libs/open3d-devel-windows-amd64-0.18.0/CMake")
+find_package(Open3D REQUIRED)
+include_directories(${Open3D_INCLUDE_DIRS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
-
-include(FetchContent)
-
-FetchContent_Declare(
-  json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG v3.10.5 # Adjust the tag to the version you want to use
-)
-
-# Make the fetched content available.
-FetchContent_MakeAvailable(json)
 
 # Add source files to this project's target.
 set(SOURCE_FILES
@@ -98,7 +65,7 @@ if(BUILD_DLL)
     list(REMOVE_ITEM SOURCE_FILES "test.cpp")
     add_library (${TARGET_NAME} SHARED ${SOURCE_FILES})
 else()
-	list(APPEND SOURCE_FILES "test.cpp")
+list(APPEND SOURCE_FILES "test.cpp")
     add_executable(${TARGET_NAME} ${SOURCE_FILES})
 endif()
 
@@ -106,7 +73,7 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(${TARGET_NAME} PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${TORCH_LIBRARIES} ${OpenCV_LIBRARIES} ${Open3D_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen -lstdc++fs nlohmann_json::nlohmann_json)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${TORCH_LIBRARIES} ${OpenCV_LIBS}  ${Open3D_LIBRARIES})
 
 
 if(MSVC)
