@@ -28,6 +28,16 @@ include_directories(${Open3D_INCLUDE_DIRS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
+include(FetchContent)
+
+FetchContent_Declare(
+  json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+)
+
+# Make the fetched content available.
+FetchContent_MakeAvailable(json)
+
 # Add source files to this project's target.
 set(SOURCE_FILES
     "rcvpose.cpp"
@@ -73,7 +83,7 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(${TARGET_NAME} PUBLIC OpenMP::OpenMP_CXX)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${TORCH_LIBRARIES} ${OpenCV_LIBS}  ${Open3D_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${TORCH_LIBRARIES} ${OpenCV_LIBS}  ${Open3D_LIBRARIES} nlohmann_json::nlohmann_json)
 
 
 if(MSVC)

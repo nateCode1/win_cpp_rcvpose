@@ -28,6 +28,8 @@ RCVpose::RCVpose(Options& options)
         cout << "Warning: model directory not initialized" << endl;
         can_run = false;
     }
+
+
     // Instantiate the dataset
     try {
         auto train_dataset = RData(opts.root_dataset, opts.dname, "train", opts.class_name);
@@ -48,7 +50,6 @@ RCVpose::RCVpose(Options& options)
         cout << "Error: Cannot instantiate the dataset\n" << e.what() << endl;
         can_run = false;
     }
-
 
     // Ensure opts.batch_size is an even number or equal to one, and is greater than 0
     if (opts.batch_size % 2 != 0 && opts.batch_size != 1) {
@@ -170,8 +171,6 @@ RCVpose::RCVpose(Options& options)
         	std::cout << "\tUsed: " << used_memory / (1024 * 1024) << " MB" << std::endl;
         	std::cout << "\tFree: " << free_memory / (1024 * 1024) << " MB" << std::endl;
     		}*/
-
-
 
         }
         catch (const torch::Error& e) {

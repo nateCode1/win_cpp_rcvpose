@@ -1229,6 +1229,8 @@ Vector3d RANSAC_3D_3(const std::vector<Vertex>& xyz, const std::vector<double>& 
 
     vector<Vertex> xyz_mm(xyz.size());
 
+    cout << "xyz.size() " << xyz.size() << endl;
+
     #pragma omp parallel for
     for (int i = 0; i < xyz.size(); i++) {
         xyz_mm[i].x = xyz[i].x * 1000 / acc_unit;

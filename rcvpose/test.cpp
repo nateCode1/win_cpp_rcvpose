@@ -9,10 +9,14 @@ using namespace std;
 
 Options testing_options() {
     Options opts;
-    opts.dname = "lm";
-    opts.root_dataset = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset";
-    //or ".../dataset/public/RCVLab/Bluewrist/16yw11"
+    opts.dname = "bw";
+    //opts.root_dataset = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset";
+    opts.root_dataset = "C:\\RCVPose\\simData\\BinGen\\DATASET";
+
     opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
+    //opts.model_dir = "C:\\RCVPose\\rachel_6_14_24";
+    //opts.model_dir = "C:\\RCVPose\\nathan_6_3_24";
+
     opts.resume_train = false;
     opts.optim = "adam";
     opts.frontend = "accumulator";
@@ -117,12 +121,13 @@ int main(int argc, char* args[])
         opts = testing_options();
     }
 
+    if (estimate)
+        opts.resume_train = true;
 
     RCVpose rcv(opts);
     //Trains the model with the given parameters, if resume if true, will resume training from previous saved state
     if (train){
         //opts.resume_train = true;
-        cout<<"inside train"<<endl;
         rcv.train();
 
     }
@@ -134,13 +139,15 @@ int main(int argc, char* args[])
 
     // Estimates the pose of a single input RGBD image and prints the estimated pose as well as time taken
     if(estimate){
-        for (int i = 0; i < 100; i++) {
+        cout << "Estimating... " << endl;
+        for (int i = 4; i < 100; i++) {
             string img_num_str = to_string(i);
 
             string padded_img_num = string(6 - img_num_str.length(), '0') + img_num_str;
 
-            string img_path = "/home/jadoo/rcvpose_cpp/test/LINEMOD/ape/JPEGImages/" + padded_img_num + ".jpg";
-            string depth_path = "/home/jadoo/rcvpose_cpp/test/LINEMOD_ORIG/ape/data/depth" + img_num_str + ".dpt";
+            string img_path = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset\\LINEMOD\\ape\\JPEGImages\\" + padded_img_num + ".jpg";
+            string depth_path = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset\\LINEMOD\\ape\\data\\depth" + img_num_str + ".dpt";
+
             rcv.estimate_pose(img_path, depth_path);
         }
         return 0;

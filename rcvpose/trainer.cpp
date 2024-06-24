@@ -175,6 +175,7 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
     auto val_dataset = RData(opts.root_dataset, opts.dname, "train", opts.class_name);
     torch::optional<size_t> val_size = val_dataset.size();
 
+
  
     if (train_size.value() == 0 || !train_size.has_value()) {
         cout << "Error: Could not get size of training dataset" << endl;
@@ -226,8 +227,10 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         int count = 0;
         model->train();
 
+
         auto train_start = std::chrono::steady_clock::now();
         int train_pix_gath = 0;
+
 
         for (const auto& batch : *train_loader) {
             //if (opts.verbose) {
@@ -289,7 +292,9 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
             auto gt1Tensor = torch::stack(batches[1], 0);
             auto gt2Tensor = torch::stack(batches[2], 0);
             auto gt3Tensor = torch::stack(batches[3], 0);
+
             torch::Tensor score_sem_ = score_sem.to(torch::kCPU);
+
             //std::cout<<score_sem_.sizes()<<std::endl;
             cv::Mat sem_cv = torch_tensor_to_cv_mat(sem_target_[0][0]);
             cv::Mat sem_cv_ = torch_tensor_to_cv_mat(score_sem_[0][0]);

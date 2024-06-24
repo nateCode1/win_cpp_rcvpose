@@ -67,6 +67,7 @@ private:
     const std::string dname_;
 
     cv::Mat read_npy(const std::string& path);
+    cv::Mat read_bin(const std::string& path);
 };
 
 

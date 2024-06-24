@@ -28,7 +28,7 @@ RMapDataset::RMapDataset(
 		imgpath_ = root_ + "/YCB/" + obj_name + "/Split/ ";
 	}
 	else {
-		std::cout << "bluewrist" << std::endl;
+		std::cout << "Loading Bluewrist data " << set_ << std::endl;
 		imgpath_ = root_ + "/sim" + "/JPEGImages/";
 		radialpath1_ = root_ + "/sim" + "/Out_pt1_dm/";
 		radialpath2_ = root_ + "/sim" + "/Out_pt2_dm/";
@@ -66,6 +66,9 @@ RMapDataset::RMapDataset(
 CustomExample RMapDataset::get(size_t index) {
 	std::string img_id = ids_[index];
 
+	//std::cout << imgpath_ + img_id + ".jpg" << "  ---  ";
+	//std::cout << radialpath1_ + img_id + ".npy" << std::endl;
+
 	// TODO:
 	// Check type of data and shape stored in radial .npy (may not be float)
 
@@ -76,18 +79,62 @@ CustomExample RMapDataset::get(size_t index) {
 	
 	cv::Mat img = cv::imread(imgpath_ + img_id + ".jpg", cv::IMREAD_COLOR);
 
+	//cv::Mat radial_kpt1 = cv::imread(radialpath1_ + img_id + ".tiff", cv::IMREAD_UNCHANGED);
+	//cv::Mat radial_kpt2 = cv::imread(radialpath2_ + img_id + ".tiff", cv::IMREAD_UNCHANGED);
+	//cv::Mat radial_kpt3 = cv::imread(radialpath3_ + img_id + ".tiff", cv::IMREAD_UNCHANGED);
+
+	//cv::Mat radial_kpt1_64, radial_kpt2_64, radial_kpt3_64;
+	//radial_kpt1.convertTo(radial_kpt1_64, CV_64F);
+	//radial_kpt2.convertTo(radial_kpt2_64, CV_64F);
+	//radial_kpt3.convertTo(radial_kpt3_64, CV_64F);
+
+	//cv::Mat radial_kpt1 = read_bin(radialpath1_ + img_id + ".bin").clone();
+	//cv::Mat radial_kpt2 = read_bin(radialpath2_ + img_id + ".bin").clone();
+	//cv::Mat radial_kpt3 = read_bin(radialpath3_ + img_id + ".bin").clone();
+
 	cv::Mat radial_kpt1 = read_npy(radialpath1_ + img_id + ".npy");
 	cv::Mat radial_kpt2 = read_npy(radialpath2_ + img_id + ".npy");
 	cv::Mat radial_kpt3 = read_npy(radialpath3_ + img_id + ".npy");
-	
-	std::vector<torch::Tensor> transfromed_data = transform(img, radial_kpt1, radial_kpt2, radial_kpt3);
 
+	
+	//std::cout << "########## RADIAL MAP ###########" << std::endl;
+	//double min;
+	//double max;
+	//std::cout << radialpath1_ + img_id + "" << std::endl;
+	//cv::minMaxLoc(radial_kpt1, &min, &max);
+	//std::cout << "Min: " << min << "    Max: " << max << std::endl;
+	//int rows = radial_kpt1.rows;
+	//int cols = radial_kpt1.cols;
+	//int channels = radial_kpt1.channels();
+	//std::cout << "Shape of radial_kpt1: (" << rows << ", " << cols << ", " << channels << ")" << std::endl;
+	//std::cout << "(322, 322): " << radial_kpt1.at<double>(322, 322) << std::endl;
+
+	std::vector<torch::Tensor> transfromed_data = transform(img, radial_kpt1, radial_kpt2, radial_kpt3);
+	
 	return CustomExample(transfromed_data[0], transfromed_data[1], transfromed_data[2], transfromed_data[3], transfromed_data[4]);
 }
 
 
 c10::optional<size_t> RMapDataset::size() const {
 	return ids_.size();
+}
+
+cv::Mat RMapDataset::read_bin(const std::string& path)
+{
+	std::ifstream infile(path, std::ios::binary);
+
+	const int rows = 640;
+	const int cols = 640;
+	const int channels = 3;
+
+	std::vector<float> buffer(rows * cols * channels);
+
+	infile.read(reinterpret_cast<char*>(buffer.data()), buffer.size() * sizeof(float));
+	infile.close();
+
+	cv::Mat array(rows, cols, CV_32FC3, buffer.data());
+
+	return array;
 }
 
 cv::Mat RMapDataset::read_npy(const std::string& path)
