@@ -11,7 +11,6 @@ Options testing_options() {
     Options opts;
     opts.dname = "lm";
     opts.root_dataset = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset";
-    //or ".../dataset/public/RCVLab/Bluewrist/16yw11"
     opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
     opts.resume_train = false;
     opts.optim = "adam";
@@ -117,6 +116,8 @@ int main(int argc, char* args[])
         opts = testing_options();
     }
 
+    // Ensure model is loaded for validate or estimate option
+    if (validate || estimate) opts.resume_train = true;
 
     RCVpose rcv(opts);
     //Trains the model with the given parameters, if resume if true, will resume training from previous saved state
@@ -134,13 +135,21 @@ int main(int argc, char* args[])
 
     // Estimates the pose of a single input RGBD image and prints the estimated pose as well as time taken
     if(estimate){
+        DenseFCNResNet152 model;
+        CheckpointLoader loader(opts.model_dir, true);
+
+        model->eval();
+
+        rcv.set_model(loader.getModel());
+
         for (int i = 0; i < 100; i++) {
+            cout << "Estimating..." << endl;
             string img_num_str = to_string(i);
 
             string padded_img_num = string(6 - img_num_str.length(), '0') + img_num_str;
 
-            string img_path = "/home/jadoo/rcvpose_cpp/test/LINEMOD/ape/JPEGImages/" + padded_img_num + ".jpg";
-            string depth_path = "/home/jadoo/rcvpose_cpp/test/LINEMOD_ORIG/ape/data/depth" + img_num_str + ".dpt";
+            string img_path = opts.root_dataset + "/LINEMOD/ape/JPEGImages/" + padded_img_num + ".jpg";
+            string depth_path = opts.root_dataset + "/LINEMOD/ape/data/depth" + img_num_str + ".dpt";
             rcv.estimate_pose(img_path, depth_path);
         }
         return 0;

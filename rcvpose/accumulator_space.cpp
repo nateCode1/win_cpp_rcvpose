@@ -443,7 +443,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
         string gt1_path, gt2_path, gt3_path;
         if(opts.dname == "lm")
         {
-	     	gt1_path = opts.root_dataset + "/LINEMOD/" + class_name + "/Out_pt1_dm/" + test_img + ".npy";
+	     	    gt1_path = opts.root_dataset + "/LINEMOD/" + class_name + "/Out_pt1_dm/" + test_img + ".npy";
             	gt2_path = opts.root_dataset + "/LINEMOD/" + class_name + "/Out_pt2_dm/" + test_img + ".npy";
             	gt3_path = opts.root_dataset + "/LINEMOD/" + class_name + "/Out_pt3_dm/" + test_img + ".npy";
         }
@@ -1163,178 +1163,400 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 
 void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& img, cv::Mat& depth, const vector<vector<double>>& keypoints, const vector<Vertex>& orig_point_cloud )
 {
-    auto start = chrono::high_resolution_clock::now();
+    // Print header for console output
+    cout << endl << string(75, '=') << endl;
+    cout << string(17, ' ') << "Estimating 6D Pose" << endl;
 
-    cv::Mat img_tmp;
-    if (opts.demo_mode) {
-        img_tmp = img.clone();
-    }
+    cv::Mat img_cpy = img.clone();
 
+    // Check whether CUDA is available
     bool use_cuda = torch::cuda::is_available();
+
+    // Define the device to be used
     torch::DeviceType device_type = use_cuda ? torch::kCUDA : torch::kCPU;
     torch::Device device(device_type);
-    model->to(device);
-    model->eval();
 
-    torch::Tensor semantic, radial1, radial2, radial3;
+    const float mask_threshold = opts.mask_threshold;
 
-    FCResBackbone(model, img, semantic, radial1, radial2, radial3, device_type, false);
+    cout << "Masking Threshold: " << mask_threshold << endl;
 
-    cv::Mat sem_cv = torch_tensor_to_cv_mat(semantic);
-    cv::Mat rad1_cv = torch_tensor_to_cv_mat(radial1);
-    cv::Mat rad2_cv = torch_tensor_to_cv_mat(radial2);
-    cv::Mat rad3_cv = torch_tensor_to_cv_mat(radial3);
 
-    cv::transpose(sem_cv, sem_cv);
-    cv::transpose(rad1_cv, rad1_cv);
-    cv::transpose(rad2_cv, rad2_cv);
-    cv::transpose(rad3_cv, rad3_cv);
 
-    cv::normalize(sem_cv, sem_cv, 0, 1, cv::NORM_MINMAX);
+    // Variables for timing
+    long long backend_net_time = 0;
+    long long acc_time = 0;
+    int general_counter = 0;
 
-    cv::Mat threshold;
-    cv::threshold(sem_cv, threshold, 0.8, 1, cv::THRESH_BINARY);
-    threshold.convertTo(sem_cv, sem_cv.type());
-    threshold.release();
+    torch::Tensor dummy_tensor = torch::randn({ 1, 3, 640, 480 });
+    dummy_tensor = dummy_tensor.to(device);
+    cout << "dummy tensor to device" << endl;
+    auto dummy_output = model->forward(dummy_tensor);
+    //Pass the model a dummy tensor
+    try {
+        if (opts.verbose) {
+            cout << "Testing model with dummy tensor" << endl;
+        }
+        torch::Tensor dummy_tensor = torch::randn({ 1, 3, 640, 480 });
+        dummy_tensor = dummy_tensor.to(device);
+        cout << "dummy tensor to device" << endl;
+        auto dummy_output = model->forward(dummy_tensor);
+        if (opts.verbose) {
+            cout << "Model test successful" << endl;
+        }
+    }
+    catch (const c10::Error& e) {
+        cerr << "Error loading model" << endl;
+        exit(EXIT_FAILURE);
+    }
 
-    cv::Mat sem_tmp, depth_tmp, rad1_tmp, rad2_tmp, rad3_tmp;
 
-    sem_cv.convertTo(sem_tmp, CV_32F);
-    depth.convertTo(depth_tmp, CV_32F);
-    rad1_cv.convertTo(rad1_tmp, CV_32F);
-    rad2_cv.convertTo(rad2_tmp, CV_32F);
-    rad3_cv.convertTo(rad3_tmp, CV_32F);
+    // Print an extra line if verbose
+    if (opts.verbose) {
+        cout << endl;
+    }
 
-    rad1_tmp = rad1_tmp.mul(sem_tmp);
-    rad2_tmp = rad2_tmp.mul(sem_tmp);
-    rad3_tmp = rad3_tmp.mul(sem_tmp);
-    depth_tmp = depth_tmp.mul(sem_tmp);
+    vector<Vertex> xyz_load = orig_point_cloud;
 
-    rad1_cv = rad1_tmp.clone();
-    rad2_cv = rad2_tmp.clone();
-    rad3_cv = rad3_tmp.clone();
-    depth = depth_tmp.clone();
 
-    sem_tmp.release();
-    depth_tmp.release();
-    rad1_tmp.release();
-    rad2_tmp.release();
+    // Start high resolution timer for accumulation
+    auto acc_start = chrono::high_resolution_clock::now();
 
-    vector<Vertex> pixel_coor;
-    for (int i = 0; i < sem_cv.rows; i++) {
-        for (int j = 0; j < sem_cv.cols; j++) {
-            if (sem_cv.at<float>(i, j) == 1) {
-                Vertex v;
-                v.x = i;
-                v.y = j;
-                v.z = 1;
+    std::vector<float> offset_vec;
+    std::vector<float> kp1_off;
+    std::vector<float> kp2_off;
+    std::vector<float> kp3_off;
 
-                pixel_coor.push_back(v);
+    int counter = 0;
+
+    // Record the current time using a high-resolution clock
+    auto img_start = chrono::high_resolution_clock::now();
+
+    // Initialize a 3x3 matrix of estimated keypoints with zeros
+    double estimated_kpts[3][3];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            estimated_kpts[i][j] = 0;
+        }
+    }
+
+    // Initialize keypoint count
+    int keypoint_count = 1;
+
+
+    // Convert the xyz_load and linemod_K to Eigen Matrices for further computations
+    matrix xyz_load_matrix = convertToEigenMatrix(xyz_load);
+    matrix linemod_K_matrix = convertToEigenMatrix(linemod_K);
+    matrix bw_K_matrix = convertToEigenMatrix(bw_K);
+
+    // Define empty matrices for storing dump and transformed load data
+    Eigen::MatrixXd dump, xyz_load_transformed;
+
+    torch::Tensor semantic_output;
+    torch::Tensor radial_output1;
+    torch::Tensor radial_output2;
+    torch::Tensor radial_output3;
+
+    // Record the current time before executing the FCResBackbone
+    auto start = chrono::high_resolution_clock::now();
+    
+    // Execute the FCResBackbone model to get semantic and radial output
+    FCResBackbone(model, img, semantic_output, radial_output1, radial_output2, radial_output3, device_type, false);
+
+    // Record the current time after executing the FCResBackbone
+    auto end = chrono::high_resolution_clock::now();
+
+    // Add the time taken to execute the FCResBackbone to the total network time
+    backend_net_time += chrono::duration_cast<chrono::milliseconds>(end - start).count();
+
+    vector<torch::Tensor> radial_outputs = { radial_output1, radial_output2, radial_output3 };
+
+    // Print the FCResBackbone speed, semantic output shape, and radial output shape if verbose option is enabled
+    if (opts.verbose) {
+        cout << "FCResBackbone Speed: " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl << endl;
+    }
+
+    // Loop over each keypoint for estimation
+    for (int z = 0; z < keypoints.size(); z++) {
+        if (opts.verbose) {
+            cout << string(50, '-') << endl;
+            cout << string(15, ' ') << "Keypoint Count: " << keypoint_count << endl;
+        }
+
+        // Get the current keypoint
+        auto keypoint = keypoints[keypoint_count];
+
+        // Print the keypoint data if verbose option is enabled
+        if (opts.verbose) {
+            cout << "Keypoint data: \n" << keypoint << endl << endl;
+        }
+
+        // Initialize iteration count
+        int iteration_count = 0;
+
+        // Initialize list for storing centers
+        vector<Eigen::MatrixXd> centers_list;
+
+        // Convert the current keypoint to an Eigen matrix for further computations
+        matrix keypoint_matrix = vectorToEigenMatrix(keypoint);
+
+
+        // Convert the semantic and radial output tensors to OpenCV matrices
+        cv::Mat sem_cv = torch_tensor_to_cv_mat(semantic_output);
+
+
+        cv::Mat rad_cv = torch_tensor_to_cv_mat(radial_outputs[keypoint_count - 1]);
+
+        cv::Mat rad_cv_;
+
+        // Load the depth image
+        cv::Mat depth_cv = depth;
+
+        if (opts.dname == "bw")
+            depth_cv = depth_cv * 0.1; //0.1 is depth_scale
+
+        // Transpose the semantic and radial matrices for correct orientation
+
+        if (!opts.use_gt) {
+            cv::transpose(sem_cv, sem_cv);
+            cv::transpose(rad_cv, rad_cv);
+            double min;
+            double max;
+            cv::Point min_loc;
+            cv::Point max_loc;
+
+            minMaxLoc(sem_cv, &min, &max, &min_loc, &max_loc);
+
+            cout << "SEM Max: " << max << " SEM Min: " << min << endl;
+        }
+
+        // Check if the images have the same dimensions
+        if (sem_cv.size() != rad_cv.size() || sem_cv.type() != rad_cv.type()) {
+            std::cerr << "Error: The dimensions or types of the two matrices are not the same." << std::endl;
+        }
+
+        //sem_cv = rad_cv.clone();
+
+        double minVal;
+        double maxVal;
+        cv::Point minLoc;
+        cv::Point maxLoc;
+        minMaxLoc(sem_cv, &minVal, &maxVal, &minLoc, &maxLoc);
+        cout << "min val: " << minVal << endl;
+        cout << "max val: " << maxVal << endl;
+
+        minMaxLoc(rad_cv, &minVal, &maxVal, &minLoc, &maxLoc);
+
+        cout << "RAD Max: " << maxVal << " RAD Min: " << minVal << endl;
+        cout << "Max Index: " << maxLoc.x << " " << maxLoc.y << endl;
+        cout << "Min Index: " << minLoc.x << " " << minLoc.y << endl;
+
+        // For debugging
+        //cv::imshow("img", img);
+        //cv::waitKey(0);
+        //cv::imshow("sem_cv", sem_cv);
+        //cv::waitKey(0);
+
+        cv::Mat thresholded;
+        cv::threshold(sem_cv, thresholded, 0.8, 1, cv::THRESH_BINARY);
+        thresholded.convertTo(sem_cv, sem_cv.type());
+        thresholded.release();
+
+        cv::Mat sem_tmp, depth_tmp, rad_tmp, rad_tmp_;
+
+        // Convert the datatypes of semantic, depth, and radial matrices
+        sem_cv.convertTo(sem_tmp, CV_32F);
+        depth_cv.convertTo(depth_tmp, CV_32F);
+        rad_cv.convertTo(rad_tmp, CV_32F);
+        rad_cv_.convertTo(rad_tmp_, CV_32F);
+
+
+        minMaxLoc(rad_cv_, &minVal, &maxVal, &minLoc, &maxLoc);
+
+        cout << "RAD Max: " << maxVal << " RAD Min: " << minVal << endl;
+        cout << "Max Index: " << maxLoc.x << " " << maxLoc.y << endl;
+        cout << "Min Index: " << minLoc.x << " " << minLoc.y << endl;
+
+        // Multiply the radial matrix by the semantic matrix
+        rad_tmp = rad_tmp.mul(sem_cv);
+        depth_tmp = depth_tmp.mul(sem_tmp);
+        depth_cv = depth_tmp.clone();
+        rad_cv = rad_tmp.clone();
+
+        rad_tmp.release();
+        depth_tmp.release();
+        sem_tmp.release();
+
+        cout << "keypoint_count " << keypoint_count << endl;
+
+        cv::imwrite(opts.model_dir + "/semantic_out_val.png", sem_cv * 255);
+        
+        // Gather the pixel coordinates from the semantic output
+        vector<Vertex> pixel_coor;
+        for (int i = 0; i < sem_cv.rows; i++) {
+            for (int j = 0; j < sem_cv.cols; j++) {
+                if (sem_cv.at<float>(i, j) == 1) {
+                    //std::cout<<sem_cv.at<float>(i, j)<<std::endl;
+                    Vertex v;
+                    v.x = static_cast<double>(i);
+                    v.y = static_cast<double>(j);
+                    v.z = 1;
+                    pixel_coor.push_back(v);
+                }
+            }
+        }
+
+
+        // Print the number of pixel coordinates gathered if verbose option is enabled
+        if (opts.verbose) {
+            cout << "Number of pixels gatherd: " << pixel_coor.size() << endl << endl;
+        }
+
+        // Define a vector for storing the radial values
+        vector<double> radial_list;
+
+        for (auto cord : pixel_coor) {
+            radial_list.push_back(static_cast<double>(rad_cv.at<float>(cord.x, cord.y)));
+            //std::cout<<rad_cv.at<float>(cord.x, cord.y)<<"  ,  ";
+        }
+        std::cout << std::endl;
+
+        // Convert the depth image to a pointcloud
+        vector<Vertex> xyz;
+        Eigen::MatrixXd xyz_r;
+        if (opts.dname == "bw")
+        {
+            depth_cv = depth_cv / 1000;
+            xyz = perspectiveDepthImageToPointCloud(depth_cv);
+            //xyz_r = rgbd_to_point_cloud(depth_cv,rad_cv);
+
+        }
+
+        else if (opts.dname == "lm")
+        {
+            depth_cv = depth_cv / 1000;
+            xyz = rgbd_to_point_cloud(linemod_K, depth_cv);
+        }
+
+        // Define a vector for storing the transformed pointcloud
+        if (opts.verbose) {
+            cout << "Calculating 3D vector center (Accumulator_3D)" << endl;
+            start = chrono::high_resolution_clock::now();
+        }
+
+        //Calculate the estimated center in mm
+        Eigen::Vector3d estimated_center_mm;
+        //estimated_center_mm = Accumulator_3D(xyz, radial_list, opts.verbose);
+        //Eigen::Vector3d estimated_center_mm = Accumulator_3D(xyz_r, opts.verbose);
+        cout << "xyz.size() " << xyz.size() << endl;
+        estimated_center_mm = RANSAC_3D_3(xyz, radial_list, 4500, opts.verbose);
+
+        // Print the number of centers returned and the estimate if verbose option is enabled
+        if (opts.verbose) {
+            end = chrono::high_resolution_clock::now();
+            cout << "\tAcc Space Time: " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl;
+            cout << "\tEstimate: " << estimated_center_mm[0] << " " << estimated_center_mm[1] << " " << estimated_center_mm[2] << endl << endl;
+
+        }
+
+        // Save the estimation to the centers
+        for (int i = 0; i < 3; i++) {
+            estimated_kpts[keypoint_count - 1][i] = estimated_center_mm[i];
+        }
+        //std::cout << transformed_gt_center_mm_vector[0] << " , " << transformed_gt_center_mm_vector[1] << " , " << transformed_gt_center_mm_vector[2] << std::endl;
+        std::cout << estimated_kpts[keypoint_count - 1][0] << " , " << estimated_kpts[keypoint_count - 1][1] << " , " << estimated_kpts[keypoint_count - 1][2] << std::endl;
+        std::cout << "######" << std::endl;
+
+        //filename_list.push_back(test_img);
+
+        iteration_count++;
+
+        keypoint_count++;
+
+        if (keypoint_count == 4) {
+            break;
+        }
+    }
+
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (estimated_kpts[i][j] == 0) {
+                cout << "Error: estimated_kpts is empty" << endl;
+                break;
             }
         }
     }
 
-    vector<double> radial1_list, radial2_list, radial3_list;
+    const int num_keypoints = 3;
 
-    for (auto cord : pixel_coor) {
-        radial1_list.push_back(static_cast<double>(rad1_cv.at<float>(cord.x, cord.y)));
-        radial2_list.push_back(static_cast<double>(rad2_cv.at<float>(cord.x, cord.y)));
-        radial3_list.push_back(static_cast<double>(rad3_cv.at<float>(cord.x, cord.y)));
-    }
-
-    vector<Vertex> xyz = rgbd_to_point_cloud(linemod_K, depth);
-
-    depth.release();
-    sem_cv.release();
-    rad1_cv.release();
-    rad2_cv.release();
-    rad3_cv.release();
-
-    for (int i = 0; i < xyz.size(); i++) {
-        xyz[i].x = xyz[i].x / 1000;
-        xyz[i].y = xyz[i].y / 1000;
-        xyz[i].z = xyz[i].z / 1000;
-    }
-
-
-
-    Eigen::Vector3d keypoint1 = Accumulator_3D(xyz, radial1_list, false);
-    Eigen::Vector3d keypoint2 = Accumulator_3D(xyz, radial2_list, false);
-    Eigen::Vector3d keypoint3 = Accumulator_3D(xyz, radial3_list, false);
-
-    double estimated_kpts[3][3];
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            if (i == 0) {
-				estimated_kpts[i][j] = keypoint1(j);
-			}
-            else if (i == 1) {
-				estimated_kpts[i][j] = keypoint2(j);
-			}
-            else {
-				estimated_kpts[i][j] = keypoint3(j);
-			}
-
-        }
-    }
-
-    double RT[4][4];
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            RT[i][j] = 0;
-        }
-    }
-
+    double RT[4][4] = {
+        {0, 0, 0, 0},
+        {0, 0, 0, 0},
+        {0,0,0,0},
+        {0,0,0,1}
+    };
+    // for (int i = 0; i < 4; i++) {
+    //     for (int j = 0; j < 4; j++) {
+    //         RT[i][j] = 0;
+    //     }
+    // }
 
     double kpts[3][3];
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < num_keypoints; i++) {
         for (int j = 0; j < 3; j++) {
             kpts[i][j] = keypoints[i + 1][j] * 1000;
+            //std::cout<<kpts[i][j]<<" , ";
         }
+        //std::cout<<std::endl;
     }
 
-    lmshorn(kpts, estimated_kpts, 3, RT);
 
-    Eigen::MatrixXd RT_matrix = Eigen::MatrixXd::Zero(4, 4);
-    for (int i = 0; i < 4; i++) {
+
+    // Calculate the RT matrix
+    lmshorn(kpts, estimated_kpts, num_keypoints, RT);
+
+
+    Eigen::MatrixXd RT_matrix = Eigen::MatrixXd::Zero(3, 4);
+
+    for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 4; j++) {
             RT_matrix(i, j) = RT[i][j];
         }
-	}
-
-    Eigen::MatrixXd xyz_load_mat = convertToEigenMatrix(orig_point_cloud);
-    Eigen::MatrixXd linemod_k_matrix = convertToEigenMatrix(linemod_K);
-
-    Eigen::MatrixXd xy, xyz_load_est;
-
-    project(xyz_load_mat * 1000, linemod_k_matrix, RT_matrix, xy, xyz_load_est);
-
-
-    if (opts.verbose) {
-        auto end = chrono::high_resolution_clock::now();
-        auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
-        auto ms = duration.count() % 1000;
-        auto sec = duration.count() / 1000;
-        cout << "Took " << sec << " seconds and " << ms << " miliseconds to estimate 6d pose for image." << endl;
     }
+    std::cout << RT_matrix << std::endl;
+    matrix xy, xyz_load_est_transformed;
 
+
+
+    // Project the estimated position
+    if (opts.dname == "lm")
+        project(xyz_load_matrix * 1000, linemod_K_matrix, RT_matrix, xy, xyz_load_est_transformed);
+    else if (opts.dname == "bw")
+        project(xyz_load_matrix * 1000, bw_K_matrix, RT_matrix, xy, xyz_load_est_transformed);
+
+    // If in demo mode, display the estimated position
     if (opts.demo_mode) {
         int out_of_range = 0;
+        cv::Mat img = img_cpy;
+        cv::Mat img_only_points;
+        img_only_points = cv::Mat::zeros(img.size(), CV_8UC3);
+
         for (int i = 0; i < xy.rows(); i++) {
             int y = static_cast<int>(xy(i, 1));
             int x = static_cast<int>(xy(i, 0));
-            if (0 <= y && y < img_tmp.rows && 0 <= x && x < img_tmp.cols) {
-                img_tmp.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
+            if (0 <= y && y < img.rows && 0 <= x && x < img.cols) {
+                img.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
+                img_only_points.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
             }
             else {
                 out_of_range++;
             }
-		}
-        cout << out_of_range << " points out of range." << endl;
-        cv::imshow("Image with points overlayed", img_tmp);
-        cv::waitKey(100);
-
+        }
+        cv::imshow("Image with point overlay", img);
+        cv::waitKey(10);
     }
 
-
+    if (opts.verbose) {
+        cout << string(50, '-') << endl;
+    }   
 }

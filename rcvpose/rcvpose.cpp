@@ -301,6 +301,10 @@ void RCVpose::estimate_pose(cv::Mat img_with_depth_channel)
 	estimate_pose(img_, depth_);
 }
 
+void RCVpose::set_model(DenseFCNResNet152 new_model) {
+    model = new_model;
+}
+
 void RCVpose::estimate_pose(double* img, double* depth, const int height, const int width)
 {
     //Img must have the shape (height, width, 3)
