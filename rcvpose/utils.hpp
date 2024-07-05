@@ -27,7 +27,8 @@ inline std::map<int, std::map<std::string, std::vector<float>>> get_config() {
     return {
         {1,
          {
-             {"max_iteration", {200000}},
+             {"max_iteration", {400000}}, //BW
+             //{"max_iteration", {200000}}, //LM
              {"lr", {1e-4}},
              {"momentum", {0.99}},
              {"betas", {0.9, 0.999}},

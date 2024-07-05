@@ -9,14 +9,15 @@ using namespace std;
 
 Options testing_options() {
     Options opts;
-    opts.dname = "lm";
-    opts.root_dataset = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset";
+    opts.dname = "bw";
+    opts.root_dataset = "C:\\RCVPose\\dataset";
     opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
     opts.resume_train = false;
     opts.optim = "adam";
     opts.frontend = "accumulator";
     opts.batch_size = 8;
-    opts.class_name = "ape";
+    //opts.class_name = "ape";
+    opts.class_name = "bwpnew1";
     opts.initial_lr = 0.001;
     opts.reduce_on_plateau = true;
     opts.patience = 10;
@@ -123,7 +124,6 @@ int main(int argc, char* args[])
     //Trains the model with the given parameters, if resume if true, will resume training from previous saved state
     if (train){
         //opts.resume_train = true;
-        cout<<"inside train"<<endl;
         rcv.train();
 
     }
@@ -150,6 +150,7 @@ int main(int argc, char* args[])
 
             string img_path = opts.root_dataset + "/LINEMOD/ape/JPEGImages/" + padded_img_num + ".jpg";
             string depth_path = opts.root_dataset + "/LINEMOD/ape/data/depth" + img_num_str + ".dpt";
+
             rcv.estimate_pose(img_path, depth_path);
         }
         return 0;
