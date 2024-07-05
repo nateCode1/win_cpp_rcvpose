@@ -50,6 +50,8 @@ public:
 
     void save_all_test_tensors();
 
+    void set_model(DenseFCNResNet152 new_model);
+
 private:
     Options opts;
     torch::DeviceType device_type;

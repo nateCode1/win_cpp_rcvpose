@@ -117,8 +117,8 @@ int main(int argc, char* args[])
         opts = testing_options();
     }
 
-    if (estimate)
-        opts.resume_train = true;
+    // Ensure model is loaded for validate or estimate option
+    if (validate || estimate) opts.resume_train = true;
 
     RCVpose rcv(opts);
     //Trains the model with the given parameters, if resume if true, will resume training from previous saved state
@@ -135,14 +135,21 @@ int main(int argc, char* args[])
 
     // Estimates the pose of a single input RGBD image and prints the estimated pose as well as time taken
     if(estimate){
-        cout << "Estimating... " << endl;
-        for (int i = 4; i < 100; i++) {
+        DenseFCNResNet152 model;
+        CheckpointLoader loader(opts.model_dir, true);
+
+        model->eval();
+
+        rcv.set_model(loader.getModel());
+
+        for (int i = 0; i < 100; i++) {
+            cout << "Estimating..." << endl;
             string img_num_str = to_string(i);
 
             string padded_img_num = string(6 - img_num_str.length(), '0') + img_num_str;
 
-            string img_path = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset\\LINEMOD\\ape\\JPEGImages\\" + padded_img_num + ".jpg";
-            string depth_path = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset\\LINEMOD\\ape\\data\\depth" + img_num_str + ".dpt";
+            string img_path = opts.root_dataset + "/LINEMOD/ape/JPEGImages/" + padded_img_num + ".jpg";
+            string depth_path = opts.root_dataset + "/LINEMOD/ape/data/depth" + img_num_str + ".dpt";
 
             rcv.estimate_pose(img_path, depth_path);
         }
