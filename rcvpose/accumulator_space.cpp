@@ -22,7 +22,11 @@ unordered_map<string, double> add_threshold = {
     {"can", 0.028415044264086586},
     {"driller", 0.031877906042},
     {"holepuncher", 0.019606109985},
-    {"bluewrist", 0.011928339948968196}
+    {"bluewrist", 0.011928339948968196},
+    {"bwp2", 0.01553914824564075},
+    {"bwp3", 0.0220182539299},
+    {"bwp4", 0.0292460786011},
+    {"bwp5", 0.039153778670051514}
 };
 
 
@@ -848,16 +852,16 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
                 RT_matrix(i, j) = RT[i][j];
             }
         }
-	std::cout<<RT_matrix<<std::endl;
+	    std::cout<<RT_matrix<<std::endl;
         matrix xy, xyz_load_est_transformed;
 
 
-
+        
         // Project the estimated position
         if(opts.dname == "lm")
         	project(xyz_load_matrix * 1000, linemod_K_matrix, RT_matrix, xy, xyz_load_est_transformed);
-	else if(opts.dname == "bw")
-		project(xyz_load_matrix * 1000, bw_K_matrix, RT_matrix, xy, xyz_load_est_transformed);
+	    else if(opts.dname == "bw")
+		    project(xyz_load_matrix * 1000, bw_K_matrix, RT_matrix, xy, xyz_load_est_transformed);
 
         // If in demo mode, display the estimated position
         if (opts.demo_mode) {
@@ -1070,7 +1074,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             avg_std_deviation_af_icp = avg_std_deviation_af_icp / af_icp_std_deviations.size();
 
             ofstream myfile;
-            string save_path = "data/img_" + test_img + ".txt";
+            string save_path = opts.model_dir + "/data/img_" + test_img + ".txt";
             myfile.open(save_path, ios::app);
             myfile << "Image number " << test_img << " took " << sec << " seconds and " << ms << " miliseconds to calculate offset." << endl;
             myfile << "Image Count: " << general_counter << endl;

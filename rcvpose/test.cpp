@@ -10,18 +10,14 @@ using namespace std;
 Options testing_options() {
     Options opts;
     opts.dname = "bw";
-    //opts.root_dataset = "C:\\RCVPose\\libs\\cpp_rcvpose_ape_dataset\\rcvpose_package\\dataset";
-    opts.root_dataset = "C:\\RCVPose\\simData\\BinGen\\DATASET";
-
+    opts.root_dataset = "C:\\RCVPose\\dataset";
     opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
-    //opts.model_dir = "C:\\RCVPose\\rachel_6_14_24";
-    //opts.model_dir = "C:\\RCVPose\\nathan_6_3_24";
-
     opts.resume_train = false;
     opts.optim = "adam";
     opts.frontend = "accumulator";
     opts.batch_size = 8;
-    opts.class_name = "ape";
+    //opts.class_name = "ape";
+    opts.class_name = "bwpnew1";
     opts.initial_lr = 0.001;
     opts.reduce_on_plateau = true;
     opts.patience = 10;

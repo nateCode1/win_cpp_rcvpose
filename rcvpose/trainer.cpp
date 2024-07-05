@@ -577,7 +577,7 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         }
         
         // Reduce learning rate every 70 epoch
-        if (opts.reduce_on_plateau = false){
+        if (opts.reduce_on_plateau == false){
             if (epoch % 70 == 0 && epoch != 0) {
                 cout << "Learning rate reduction" << endl;
                 current_lr.clear();
@@ -629,7 +629,6 @@ void Trainer::train(Options& opts, DenseFCNResNet152& model)
         if (iteration >= max_iteration) {
             break;
         }
-
 
         auto epoch_train_end = std::chrono::steady_clock::now();
         auto epoch_total_time = std::chrono::duration_cast<std::chrono::seconds>(epoch_train_end - epoch_start_time);
