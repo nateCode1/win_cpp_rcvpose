@@ -271,7 +271,6 @@ std::vector<Vertex> perspectiveDepthImageToPointCloud2(const cv::Mat& image_dept
 }
 
 std::vector<Vertex> perspectiveDepthImageToPointCloud(const cv::Mat& depthImg, const std::string& jsonPath) {
-    cout << "perspectiveDepthImageToPointCloud running. jsonPath is: " << jsonPath << endl;
     std::ifstream i(jsonPath);
     json data;
     i >> data;

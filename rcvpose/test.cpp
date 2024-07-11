@@ -17,7 +17,7 @@ Options testing_options() {
     opts.frontend = "accumulator";
     opts.batch_size = 8;
     //opts.class_name = "ape";
-    opts.class_name = "bwpnew1";
+    opts.class_name = "bwp2";
     opts.initial_lr = 0.001;
     opts.reduce_on_plateau = true;
     opts.patience = 10;
@@ -135,21 +135,16 @@ int main(int argc, char* args[])
 
     // Estimates the pose of a single input RGBD image and prints the estimated pose as well as time taken
     if(estimate){
-        DenseFCNResNet152 model;
-        CheckpointLoader loader(opts.model_dir, true);
-
-        model->eval();
-
-        rcv.set_model(loader.getModel());
-
-        for (int i = 0; i < 100; i++) {
+        for (int i = 1; i < 100; i++) {
             cout << "Estimating..." << endl;
-            string img_num_str = to_string(i);
+            string img_num_str_offset = to_string(i + 4500);
 
-            string padded_img_num = string(6 - img_num_str.length(), '0') + img_num_str;
+            string padded_img_num_offset = string(6 - img_num_str_offset.length(), '0') + img_num_str_offset;
 
-            string img_path = opts.root_dataset + "/LINEMOD/ape/JPEGImages/" + padded_img_num + ".jpg";
-            string depth_path = opts.root_dataset + "/LINEMOD/ape/data/depth" + img_num_str + ".dpt";
+            string img_path = opts.root_dataset + "/sim/JPEGImages/" + padded_img_num_offset + ".jpg";
+            string depth_path = opts.root_dataset + "/sim/data/depth" + img_num_str_offset + ".png";
+
+            cout << depth_path << endl;
 
             rcv.estimate_pose(img_path, depth_path);
         }

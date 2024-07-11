@@ -336,6 +336,7 @@ void RCVpose::estimate_pose(const std::string& img_path, const std::string& dept
 
     try {
         img = cv::imread(img_path);
+
         depth = read_depth_to_cv(depth_path, false);
     }
     catch (const std::exception& e) {
@@ -344,20 +345,28 @@ void RCVpose::estimate_pose(const std::string& img_path, const std::string& dept
 	}
 
     inference();
-
-
 }
 
 
 void RCVpose::inference()
 {
-    string rootPath = opts.root_dataset + "/LINEMOD/" + opts.class_name + "/";
-
-    string keypoints_path = rootPath + "Outside9.npy";
+    string rootPath;
+    string keypoints_path;
+    string pcv_load_path;
+    if (opts.dname == "lm") 
+    {
+        rootPath = opts.root_dataset + "/LINEMOD/" + opts.class_name + "/";
+        keypoints_path = rootPath + "Outside9.npy";
+        pcv_load_path = rootPath + "pc_" + opts.class_name + ".npy";
+    }
+    else if (opts.dname == "bw") 
+    {
+        rootPath = opts.root_dataset + "/sim/";
+        keypoints_path = rootPath + "/kpts/obj_000001_sparse9.npy";
+        pcv_load_path = rootPath + "/models/pc.npy";
+    }
 
     vector<vector<double>> keypoints = read_double_npy(keypoints_path, false);
-
-    string pcv_load_path = rootPath + "pc_" + opts.class_name + ".npy";
 
     vector<Vertex> orig_point_cloud = read_point_cloud(pcv_load_path);
 
