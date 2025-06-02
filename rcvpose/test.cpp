@@ -10,8 +10,11 @@ using namespace std;
 Options testing_options() {
     Options opts;
     opts.dname = "bw";
-    opts.root_dataset = "C:\\RCVPose\\dataset";
-    opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
+    //opts.root_dataset = "C:\\RCVPose\\dataset";
+    opts.root_dataset = "C:\\RCVPose\\Datasets\\bwpnew1";
+    //opts.root_dataset = "C:\\RCVPose\\simData\\BinGen\\DATASET";
+    //opts.model_dir = "C:\\RCVPose\\win_cpp_rcvpose\\rcvpose\\trained_model";
+    opts.model_dir = "C:\\RCVPose\\models\\nathan_6_24_24_bwp1";
     opts.resume_train = false;
     opts.optim = "adam";
     opts.frontend = "accumulator";

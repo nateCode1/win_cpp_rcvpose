@@ -55,7 +55,6 @@ Eigen::MatrixXd transformKeyPoint(const Eigen::MatrixXd& keypoint, const Eigen::
     return keypointTransformed * 1000.0;
 }
 
-
 void project(const MatrixXd& xyz, const MatrixXd& K, const MatrixXd& RT, MatrixXd& xy, MatrixXd& actual_xyz)
 {
     /*
@@ -63,7 +62,6 @@ void project(const MatrixXd& xyz, const MatrixXd& K, const MatrixXd& RT, MatrixX
     K: [3, 3]
     RT: [3, 4]
     */
-
     actual_xyz = xyz * (RT.block(0, 0, RT.rows(), 3).transpose());
     MatrixXd RTslice = RT.block(0, 3, RT.rows(), 1).transpose();
 
@@ -71,9 +69,62 @@ void project(const MatrixXd& xyz, const MatrixXd& K, const MatrixXd& RT, MatrixX
         actual_xyz.row(i) += RTslice;
     }
 
+    
     MatrixXd xy_temp = actual_xyz * K.transpose();
 
     xy = xy_temp.leftCols(2).array() / xy_temp.col(2).array().replicate(1, 2);
+
+
+    //Eigen::MatrixXd xyz(6, 3);
+    //xyz << -0.0240205, 0.0265315, 0.0125515,
+    //    -0.0193409, -0.0247166, 0.0140502,
+    //    -0.0244811, 0.0215735, 0.0131606,
+    //    0.00410146, -0.018677, 0.0167601,
+    //    0.0262618, 0.0160101, 0.0167605,
+    //    0.0302675, 0.0302327, 0.00768655;
+
+    //MatrixXd transformation_matrix = RT.block<3, 4>(0, 0);
+
+    //// Convert the 3x4 transformation matrix to a 4x4 homogeneous transformation matrix
+    //MatrixXd homogeneous_transformation_matrix(4, 4);
+    //homogeneous_transformation_matrix << transformation_matrix,
+    //    0, 0, 0, 1;
+
+    //// Initialize the output matrix
+    //MatrixXd transformed_points(xyz.rows(), 3);
+
+    //// Apply the transformation row by row
+    //for (int i = 0; i < xyz.rows(); i++) {
+    //    Vector4d point_homogeneous;
+    //    point_homogeneous.head<3>() = xyz.row(i);
+    //    point_homogeneous(3) = 1.0;
+
+    //    Vector4d transformed_point = homogeneous_transformation_matrix * point_homogeneous;
+    //    transformed_points.row(i) = transformed_point.head<3>();
+    //}
+
+    //actual_xyz = transformed_points;
+
+    //// Perform projection
+    //MatrixXd projected_points = K * transformed_points.transpose();
+    //MatrixXd projected_points_cartesian = projected_points.topRows(2).array().rowwise() / projected_points.row(2).array();
+    //xy = projected_points_cartesian.transpose();
+
+    //cout << "xy " << xy << endl;
+
+    // WRITE POINTS TO PATH--------------------------------------------------------------------------------------------------
+    string peth = "C:\\RCVPose\\simData\\BinGen\\points.txt";
+    std::ofstream file(peth);
+    for (int i = 0; i < xy.rows(); ++i) {
+        for (int j = 0; j < xy.cols(); ++j) {
+            file << xy(i, j);
+            if (j != xy.cols() - 1)
+                file << " ";
+        }
+        file << "\n";
+    }
+    file.close();
+    // -----------------------------------------------------------------------------------------------------------------------
 }
 
 

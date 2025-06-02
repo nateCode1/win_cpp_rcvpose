@@ -341,6 +341,11 @@ cv::Mat read_depth_to_cv(const std::string& path, const bool& debug = false) {
             depth_image = data.clone();
         }
 
+        cv::imshow("depload", depth_image);
+        cv::waitKey(0);
+
+        cv::imwrite("C:\\RCVPose/writedpt.png", depth_image);
+
         file.close();
     }
     else {
@@ -352,6 +357,7 @@ cv::Mat read_depth_to_cv(const std::string& path, const bool& debug = false) {
 
     if (debug) {
         cout << "Depth Image size: " << depth_image.size() << endl;
+        std::cout << "Number of channels: " << depth_image.channels() << std::endl;
     }
 
     return depth_image;

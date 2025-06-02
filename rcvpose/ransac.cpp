@@ -1367,9 +1367,9 @@ Vector3d RANSAC_3D_3(const std::vector<Vertex>& xyz, const std::vector<double>& 
         center.array() += zero_boundary;
     }
 
-    center[0] = (center[0] + x_mean_mm + 0.5) * acc_unit;
-    center[1] = (center[1] + y_mean_mm + 0.5) * acc_unit;
-    center[2] = (center[2] + z_mean_mm + 0.5) * acc_unit;
+    center[0] = (center[0] + x_mean_mm) * acc_unit;
+    center[1] = (center[1] + y_mean_mm) * acc_unit;
+    center[2] = (center[2] + z_mean_mm) * acc_unit;
 
     return center;
 

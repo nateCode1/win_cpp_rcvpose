@@ -95,6 +95,10 @@ void FCResBackbone(DenseFCNResNet152& model, cv::Mat& img, torch::Tensor& semant
     cv::imwrite("asdf_123.png", sem_cv_*255);*/
 }
 
+
+
+
+
 // Function for estimating 6D pose for LINEMOD
 void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 {
@@ -106,6 +110,13 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
     bool use_cuda = torch::cuda::is_available();
 
     std::cout<<opts.verbose<<"  ##########################"<<std::endl;
+
+    ofstream profile_file;
+    string save_path = opts.model_dir + "/profiling.txt";
+    profile_file.open(save_path, ios::app);
+
+    profile_file << "## START OF FUNCTION ## - Using " << (use_cuda ? "GPU" : "CPU") << endl;
+
     // Check if verbose mode is enabled
     if (opts.verbose) {
         if (use_cuda) {
@@ -201,6 +212,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
     long long backend_net_time = 0;
     long long acc_time = 0;
     long long icp_time = 0;
+    long long frontend_time = 0;
     int general_counter = 0;
 
     // Variables for counting before and after ICP
@@ -298,6 +310,9 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
     // Load keypoints from the file
     vector<vector<double>> keypoints = read_double_npy(keypoints_path, false);
 
+    cout << endl << "KPTS is  " << keypoints << endl;
+    cout << "KPTS length " << keypoints.size() << endl << endl;
+
     // Define path to data
     string data_path = rootpvPath + "JPEGImages/";
 
@@ -382,6 +397,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 
         std::cout<<RTGT_matrix<<std::endl;
         // Project the point cloud data onto the image plane
+
         if(opts.dname == "lm")
         	project(xyz_load_matrix, linemod_K_matrix, RTGT_matrix, dump, xyz_load_transformed);
 	    else if(opts.dname == "bw")
@@ -456,6 +472,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             	gt1_path = opts.root_dataset + "/sim/" + "/Out_pt1_dm/" + test_img + ".npy";
             	gt2_path = opts.root_dataset + "/sim/" + "/Out_pt2_dm/" + test_img + ".npy";
             	gt3_path = opts.root_dataset + "/sim/" + "/Out_pt3_dm/" + test_img + ".npy";
+                cout << "GT1 path " << gt1_path << endl << endl;
         }
         std::thread t1([&]() { radial_output1_ = npy_to_tensor(gt1_path); });
         std::thread t2([&]() { radial_output2_ = npy_to_tensor(gt2_path); });
@@ -471,6 +488,8 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 
         // Add the time taken to execute the FCResBackbone to the total network time
         backend_net_time += chrono::duration_cast<chrono::milliseconds>(end - start).count();
+        profile_file << "Time to detect objects and estimate radii maps: " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl;
+
 
         vector<torch::Tensor> radial_outputs = { radial_output1, radial_output2, radial_output3 };
 
@@ -479,12 +498,16 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             cout << "FCResBackbone Speed: " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl << endl;
         }
 
+
         // Loop over each keypoint for estimation
+        long long frontend_time_all_kpts_curr_iteration = 0;
         for (int z=0; z<keypoints.size(); z++) {
             if (opts.verbose) {
                 cout << string(50, '-') << endl;
                 cout << string(15, ' ') << "Keypoint Count: " << keypoint_count << endl;
             }
+
+            cout << endl << endl << "KEEEEYYYPOIIINTT " << keypoint_count << endl << endl;
 
             // Get the current keypoint
             auto keypoint = keypoints[keypoint_count];
@@ -504,13 +527,15 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             matrix keypoint_matrix = vectorToEigenMatrix(keypoint);
 
             // Compute the transformed ground truth center in mm
-            //auto transformed_gt_center_mm = transformKeyPoint(keypoint_matrix, RTGT_matrix, false);
+            auto transformed_gt_center_mm = transformKeyPoint(keypoint_matrix, RTGT_matrix, false);
 
 
             // Print the transformed ground truth center if verbose option is enabled
             if (opts.verbose) {
+                cout << "RTGT matrix" << endl;
+                cout << RTGT_matrix << endl;
                 cout << "Transformed Ground Truth Center: " << endl;
-                //cout << transformed_gt_center_mm << endl << endl;
+                cout << transformed_gt_center_mm << endl << endl;
             }
 
 
@@ -547,11 +572,10 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             else if(keypoint_count == 3)
             	rad_cv_ = torch_tensor_to_cv_mat(radial_output3_);
 
-            // Define the depth image path
-            //string depth_path = rootpvPath + "data/depth" + to_string(img_num) + ".dpt";
-            string depth_path = rootpvPath + "data/depth" + to_string(img_num);
+            cout << endl << "RAD CV " << cv::mean(rad_cv_) << endl;
 
-            cout << endl << endl << endl << "DEPTH PATH: " << depth_path << endl << endl << endl;
+            // Define the depth image path
+            string depth_path = rootpvPath + "data/depth" + to_string(img_num);
 
             // Check if ".dpt" file exists, if not, check for ".png"
             if (fs::exists(depth_path + ".dpt")) {
@@ -569,7 +593,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             cv::Mat depth_cv = read_depth_to_cv(depth_path, false);
 
             if(opts.dname=="bw")
-            	depth_cv = depth_cv*0.1; //0.1 is depth_scale
+            	depth_cv = depth_cv * 0.1; //0.1 is depth_scale
 
             // Transpose the semantic and radial matrices for correct orientation
 
@@ -603,11 +627,11 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             cout << "min val: " << minVal << endl;
             cout << "max val: " << maxVal << endl;
 
-            minMaxLoc(rad_cv, &minVal, &maxVal, &minLoc, &maxLoc);
+            //minMaxLoc(rad_cv, &minVal, &maxVal, &minLoc, &maxLoc);
 
-            cout << "RAD Max: " << maxVal << " RAD Min: " << minVal << endl;
-            cout << "Max Index: " << maxLoc.x << " " << maxLoc.y << endl;
-            cout << "Min Index: " << minLoc.x << " " << minLoc.y << endl;
+            //cout << "RAD Max: " << maxVal << " RAD Min: " << minVal << endl;
+            //cout << "Max Index: " << maxLoc.x << " " << maxLoc.y << endl;
+            //cout << "Min Index: " << minLoc.x << " " << minLoc.y << endl;
 
             cv::Mat thresholded;
             cv::threshold(sem_cv, thresholded, 0.8, 1, cv::THRESH_BINARY);
@@ -641,6 +665,13 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             rad_tmp_.release();
             depth_tmp.release();
             sem_tmp.release();
+
+            // Print Radial Error
+            cv::Mat radialDiff;
+            cv::absdiff(rad_cv, rad_cv_, radialDiff);
+            cv::Scalar radialError = cv::mean(radialDiff);
+            cout << endl << "Radial Error: " << radialError[0] << endl << endl;
+            
 
             cv::imwrite(opts.model_dir + "/semantic_out_val.png", sem_cv*255);
             //if(keypoint_count == 1)
@@ -750,44 +781,52 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             // Define a vector for storing the transformed pointcloud
             if (opts.verbose) {
                 cout << "Calculating 3D vector center (Accumulator_3D)" << endl;
-                start = chrono::high_resolution_clock::now();
             }
+            start = chrono::high_resolution_clock::now();
 
             //Calculate the estimated center in mm
             Eigen::Vector3d estimated_center_mm;
             //estimated_center_mm = Accumulator_3D(xyz, radial_list, opts.verbose);
             //Eigen::Vector3d estimated_center_mm = Accumulator_3D(xyz_r, opts.verbose);
 
+
             estimated_center_mm = RANSAC_3D_3(xyz, radial_list, 4500, opts.verbose);
 
-	    // Print the number of centers returned and the estimate if verbose option is enabled
+            end = chrono::high_resolution_clock::now();
+
+            profile_file << "RANSAC time for kpt " << z << ": " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl;
+            frontend_time += chrono::duration_cast<chrono::milliseconds>(end - start).count();
+            frontend_time_all_kpts_curr_iteration += chrono::duration_cast<chrono::milliseconds>(end - start).count();
+
+	        // Print the number of centers returned and the estimate if verbose option is enabled
             if (opts.verbose) {
-                end = chrono::high_resolution_clock::now();
-                cout << "\tAcc Space Time: " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl;
+                cout << "\tFront End Time: " << chrono::duration_cast<chrono::milliseconds>(end - start).count() << "ms" << endl;
                 cout << "\tEstimate: " << estimated_center_mm[0] << " " << estimated_center_mm[1] << " " << estimated_center_mm[2] << endl << endl;
 
             }
 
 
             // Define a vector for storing the transformed pointcloud
-            //Eigen::Vector3d transformed_gt_center_mm_vector(transformed_gt_center_mm(0, 0), transformed_gt_center_mm(0, 1), transformed_gt_center_mm(0, 2));
+            Eigen::Vector3d transformed_gt_center_mm_vector(transformed_gt_center_mm(0, 0), transformed_gt_center_mm(0, 1), transformed_gt_center_mm(0, 2));
 
             // Calculate the offset
-            //Eigen::Vector3d diff = transformed_gt_center_mm_vector - estimated_center_mm;
+            Eigen::Vector3d diff = transformed_gt_center_mm_vector - estimated_center_mm;
 
 
-            //double center_off_mm = diff.norm();
+            double center_off_mm = diff.norm();
 
 	    //offset_vec.push_back(center_off_mm);
      //       if (opts.verbose) {
      //           cout << "Estimated offset: " << center_off_mm << endl << endl;
      //       }
-	    //if(keypoint_count == 1)
-	    //	kp1_off.push_back(center_off_mm);
-	    //else if(keypoint_count == 2)
-	    //	kp2_off.push_back(center_off_mm);
-	    //else if(keypoint_count == 3)
-	    //	kp3_off.push_back(center_off_mm);
+	    if(keypoint_count == 1)
+	    	kp1_off.push_back(center_off_mm);
+	    else if(keypoint_count == 2)
+	    	kp2_off.push_back(center_off_mm);
+	    else if(keypoint_count == 3)
+	    	kp3_off.push_back(center_off_mm);
+
+        cout << endl << endl << "KEEEEYYYPOIIINTT2 " << keypoint_count << endl << endl;
 
             // Save the estimation to the centers
             for (int i = 0; i < 3; i++) {
@@ -807,6 +846,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
                 break;
             }
         }
+        profile_file << "Time to perform RANSAC all kpts: " << frontend_time_all_kpts_curr_iteration << "ms" << endl;
 
 
         for (int i = 0; i < 3; i++) {
@@ -834,6 +874,7 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 
         double kpts[3][3];
         for (int i = 0; i < num_keypoints; i++) {
+            cout << "######################################## " << keypoints[i + 1] << endl;
             for (int j = 0; j < 3; j++) {
                 kpts[i][j] = keypoints[i+1][j] * 1000;
 		//std::cout<<kpts[i][j]<<" , ";
@@ -856,7 +897,9 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
         }
 	    std::cout<<RT_matrix<<std::endl;
         matrix xy, xyz_load_est_transformed;
-        
+
+        matrix RTA_matrix = vectorOfVectorToEigenMatrix(RTGT);
+
         // Project the estimated position
         if(opts.dname == "lm")
         	project(xyz_load_matrix * 1000, linemod_K_matrix, RT_matrix, xy, xyz_load_est_transformed);
@@ -881,8 +924,8 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
                     out_of_range++;
                 }
             }
-            cv::imshow("Image with point overlay", img);
-            cv::waitKey(10);
+            cv::imshow("Image with point overlay 2 ", img);
+            cv::waitKey(1000);
         }
 
         if (opts.verbose) {
@@ -991,6 +1034,8 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 
         auto icp_end = chrono::high_resolution_clock::now();
         auto icp_duration = chrono::duration_cast<chrono::milliseconds>(icp_end - icp_start);
+        profile_file << "Time to perform ICP: " << icp_duration.count() << "ms" << endl;
+
         icp_time += icp_duration.count();
 
         if (opts.verbose) {
@@ -1133,6 +1178,8 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
             cout << "ADD: " << (static_cast<double>(bf_icp)/ static_cast<double>(general_counter)) * 100.0 << "%\t";
             printProgressBar(general_counter, total_num_img, 60);
         }
+
+        profile_file << endl;
     }
     cout << endl;
 
@@ -1162,6 +1209,15 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
     cout << "Average Time per image: " << (static_cast<double>(duration.count()) / static_cast<double>(general_counter)) << " seconds." << endl;
     cout << "Resnet152 Processing Time per image: " << (static_cast<double>(backend_net_time) / static_cast<double>(general_counter)) / 1000.0 << " seconds." << endl;
     cout << "ICP Processing Time per image: " << (static_cast<double>(icp_time) / static_cast<double>(general_counter)) / 1000.0 << " seconds." << endl;
+    cout << "Front End Processing Time per image: " << (static_cast<double>(frontend_time) / static_cast<double>(general_counter)) / 1000.0 << " seconds." << endl;
+
+    profile_file << endl << "Final results:" << endl;
+    profile_file << "Total Accumulator time: " << hours << " hours, " << min << " minutes, and " << sec << " seconds." << endl;
+    profile_file << "Average Time per image: " << (static_cast<double>(duration.count()) / static_cast<double>(general_counter)) << " seconds." << endl;
+    profile_file << "Resnet152 Processing Time per image: " << (static_cast<double>(backend_net_time) / static_cast<double>(general_counter)) / 1000.0 << " seconds." << endl;
+    profile_file << "ICP Processing Time per image: " << (static_cast<double>(icp_time) / static_cast<double>(general_counter)) / 1000.0 << " seconds." << endl;
+    profile_file << "Front End Processing Time per image: " << (static_cast<double>(frontend_time) / static_cast<double>(general_counter)) / 1000.0 << " seconds." << endl;
+    profile_file << endl << endl;
     return;
 
 }
@@ -1169,9 +1225,6 @@ void estimate_6d_pose_lm(const Options& opts, DenseFCNResNet152& model__)
 void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& img, cv::Mat& depth, const vector<vector<double>>& keypoints, const vector<Vertex>& orig_point_cloud )
 {
     cv::Mat img_cpy = img.clone();
-    // Print header for console output
-    cout << endl << string(75, '=') << endl;
-    cout << string(17, ' ') << "Estimating 6D Pose for LINEMOD" << endl;
 
     // Check whether CUDA is available
     bool use_cuda = torch::cuda::is_available();
@@ -1183,50 +1236,15 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
     // Loop over all classes in LINEMOD dataset
     string class_name = opts.class_name;
 
-    if (opts.verbose) {
-        cout << string(75, '-') << endl << string(17, ' ') << "Estimating for " << class_name << " object" << endl << endl;
-    }
-    else {
-        cout << "Estimating for " << class_name << endl;
-    }
-
-    string rootpvPath;
-    if (opts.dname == "lm")
-    {
-        rootpvPath = opts.root_dataset + "/LINEMOD/" + class_name + "/";
-    }
-    else if (opts.dname == "bw")
-    {
-        rootpvPath = opts.root_dataset + "/sim/";
-    }
-
-    // Open file containing test data
-    std::string tfile;
-    if (opts.dname == "lm")
-        tfile = opts.root_dataset + "/LINEMOD/" + class_name + "/Split/val.txt";
-    else if (opts.dname == "bw")
-        tfile = opts.root_dataset + "/sim" + "/Split/val.txt";
-    ifstream test_file(tfile);
-
-    vector<string> test_list;
-    string line;
-
-    // Read lines from test file
-    if (test_file.is_open()) {
-        while (getline(test_file, line)) {
-            line.erase(line.find_last_not_of("\n\r\t") + 1);
-            test_list.push_back(line);
-        }
-        test_file.close();
-    }
-    else {
-        cerr << "Unable to open file containing test data" << endl;
-        exit(EXIT_FAILURE);
-    }
-
-    const int total_num_img = test_list.size();
-
-    cout << "Number of test images: " << total_num_img << endl;
+    //string rootpvPath;
+    //if (opts.dname == "lm")
+    //{
+    //    rootpvPath = opts.root_dataset + "/LINEMOD/" + class_name + "/";
+    //}
+    //else if (opts.dname == "bw")
+    //{
+    //    rootpvPath = opts.root_dataset + "/sim/";
+    //}
 
     const float mask_threshold = opts.mask_threshold;
 
@@ -1234,19 +1252,19 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
 
 
     // Define path to load point cloud
-    string pcv_load_path;
-    if (opts.dname == "lm")
-        pcv_load_path = rootpvPath + "pc_" + class_name + ".npy";
-    else if (opts.dname == "bw")
-        pcv_load_path = rootpvPath + "/models/" + "pc.npy";
+    //string pcv_load_path;
+    //if (opts.dname == "lm")
+    //    pcv_load_path = rootpvPath + "pc_" + class_name + ".npy";
+    //else if (opts.dname == "bw")
+    //    pcv_load_path = rootpvPath + "/models/" + "pc.npy";
 
     // Log path if verbose
-    if (opts.verbose) {
-        cout << "Loading point cloud from path: \n\t" << pcv_load_path << endl;
-    }
+    //if (opts.verbose) {
+    //    cout << "Loading point cloud from path: \n\t" << pcv_load_path << endl;
+    //}
 
     // Read the point cloud from the file
-    pc_ptr pcv = read_point_cloud(pcv_load_path, false);
+    //pc_ptr pcv = read_point_cloud(pcv_load_path, false);
 
     // Variables for timing
     long long backend_net_time = 0;
@@ -1392,7 +1410,7 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
             cv::Mat depth_cv = depth.clone();
 
             if (opts.dname == "bw")
-                depth_cv = depth_cv * 0.1; //0.1 is depth_scale
+                depth_cv = depth_cv * 1; //0.1 is depth_scale
 
             // Transpose the semantic and radial matrices for correct orientation
 
@@ -1408,6 +1426,10 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
             double maxVal;
             cv::Point minLoc;
             cv::Point maxLoc;
+
+            //cv::Mat imload = cv::imread("C:\\Users\\nate4\\Downloads\\saved_captures\\saved_captures\\mansem.jpg", cv::IMREAD_GRAYSCALE);
+            //imload.convertTo(sem_cv, CV_32F, 1.0 / 255.0);
+
             minMaxLoc(sem_cv, &minVal, &maxVal, &minLoc, &maxLoc);
             cout << "min val: " << minVal << endl;
             cout << "max val: " << maxVal << endl;
@@ -1429,7 +1451,6 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
             sem_cv.convertTo(sem_tmp, CV_32F);
             depth_cv.convertTo(depth_tmp, CV_32F);
             rad_cv.convertTo(rad_tmp, CV_32F);
-
 
             cout << "RAD Max: " << maxVal << " RAD Min: " << minVal << endl;
             cout << "Max Index: " << maxLoc.x << " " << maxLoc.y << endl;
@@ -1595,6 +1616,7 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
             for (int i = 0; i < xy.rows(); i++) {
                 int y = static_cast<int>(xy(i, 1));
                 int x = static_cast<int>(xy(i, 0));
+                //file << x << " " << y << "\n";
                 if (0 <= y && y < img.rows && 0 <= x && x < img.cols) {
                     img.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
                     img_only_points.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
@@ -1604,32 +1626,12 @@ void estimate_6d_pose(const Options& opts, DenseFCNResNet152& model, cv::Mat& im
                 }
             }
             cv::imshow("Image with point overlay", img);
-            cv::waitKey(10);
+            cv::waitKey(0);
         }
 
         if (opts.verbose) {
             cout << string(50, '-') << endl;
         }
-
-        vector<Eigen::Vector3d> pointsGT, pointsEst, pointEst_py, pointEst_gt;
-
-
-
-        auto icp_start = chrono::high_resolution_clock::now();
-        // Load the ground truth points
-        for (int i = 0; i < xyz_load_transformed.rows(); ++i) {
-            pointsGT.push_back(1000 * Eigen::Vector3d(xyz_load_transformed(i, 0), xyz_load_transformed(i, 1), xyz_load_transformed(i, 2)));
-
-        }
-        // Load the estimated points
-        for (int i = 0; i < xyz_load_est_transformed.rows(); ++i) {
-            pointsEst.push_back(Eigen::Vector3d(xyz_load_est_transformed(i, 0), xyz_load_est_transformed(i, 1), xyz_load_est_transformed(i, 2)));
-        }
-
-        // Create point clouds for the ground truth and estimated points
-        geometry::PointCloud sceneEst;
-
-        sceneEst.points_ = pointsEst;
 
     cout << endl;
 

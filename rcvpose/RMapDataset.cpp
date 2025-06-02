@@ -96,6 +96,30 @@ CustomExample RMapDataset::get(size_t index) {
 	cv::Mat radial_kpt2 = read_npy(radialpath2_ + img_id + ".npy");
 	cv::Mat radial_kpt3 = read_npy(radialpath3_ + img_id + ".npy");
 
+
+	//auto calculateAndPrintStats = [](const cv::Mat& mat, const std::string& filepath) {
+	//	// Calculate mean
+	//	cv::Scalar meanScalar = cv::mean(mat);
+	//	double meanValue = meanScalar[0];
+
+	//	// Calculate min and max values
+	//	double minVal, maxVal;
+	//	cv::minMaxLoc(mat, &minVal, &maxVal);
+
+	//	// Print the results
+	//	std::cout << std::endl;
+	//	std::cout << "File Path: " << filepath << std::endl;
+	//	std::cout << "Mean: " << meanValue << std::endl;
+	//	std::cout << "Max: " << maxVal << std::endl;
+	//	};
+
+	//std::cout << std::endl;
+	//// Calculate and print stats for all three matrices
+	//calculateAndPrintStats(radial_kpt1, radialpath1_ + img_id + ".npy");
+	//calculateAndPrintStats(radial_kpt2, radialpath2_ + img_id + ".npy");
+	//calculateAndPrintStats(radial_kpt3, radialpath3_ + img_id + ".npy");
+	//std::cout << std::endl;
+
 	
 	//std::cout << "########## RADIAL MAP ###########" << std::endl;
 	//double min;

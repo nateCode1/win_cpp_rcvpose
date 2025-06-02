@@ -337,7 +337,7 @@ void RCVpose::estimate_pose(const std::string& img_path, const std::string& dept
     try {
         img = cv::imread(img_path);
 
-        depth = read_depth_to_cv(depth_path, false);
+        depth = read_depth_to_cv(depth_path, true);
     }
     catch (const std::exception& e) {
 		cout << "Error: " << e.what() << endl;
